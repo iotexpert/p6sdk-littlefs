@@ -1,0 +1,4 @@
+../littlefs/emubd
+../littlefs/scripts
+../littlefs/tests
+../littlefs/Makefile
