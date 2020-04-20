@@ -1,6 +1,7 @@
 #include "lfs.h"
 #include "p6sdk-littlefs.h"
 #include "iotexpert-nor.h"
+#include <stdio.h>
 
 // Read a region in a block. Negative error codes are propogated
 // to the user.
@@ -26,16 +27,14 @@
 int lfsProg(const struct lfs_config *c, lfs_block_t block,
             lfs_off_t off, const void *buffer, lfs_size_t size)
 {
-
+    //printf("Program block=%X\n",(unsigned int)block);
     iotexpert_nor_t *nor;
     nor = (iotexpert_nor_t *)c->context;
-#if 0
-    cy_rslt_t  result = cy_serial_flash_qspi_write(c->block_size*block+off, size, buffer);
+    cy_rslt_t result = iotexpert_nor_programPageSync(nor,block*c->block_size+off,(uint8_t *)buffer,(size_t *)&size);
     if(result == CY_RSLT_SUCCESS)
         return LFS_ERR_OK;
     else
         return LFS_ERR_INVAL;
-#endif    
 }
 
 // Erase a block. A block must be erased before being programmed.
@@ -45,17 +44,21 @@ int lfsProg(const struct lfs_config *c, lfs_block_t block,
 int lfsErase(const struct lfs_config *c, lfs_block_t block)
 {
 
+    //printf("Erase block=%X\n",(unsigned int)block);
     iotexpert_nor_t *nor;
     nor = (iotexpert_nor_t *)c->context;
-#if 0
-    cy_rslt_t rslt = cy_serial_flash_qspi_erase(c->block_size*block,c->block_size);
-    if(rslt == CY_RSLT_SUCCESS)
+    cy_rslt_t result = iotexpert_nor_eraseSync(nor,IOTEXPERT_NOR_ERASE_SECTOR,block*c->block_size);
+
+    if(result == CY_RSLT_SUCCESS)
+    {
+        //printf("Erase OK\n");
         return LFS_ERR_OK;
+    }
     else
     {
+        //printf("Erase Failed\n");
         return LFS_ERR_CORRUPT;
     }
-#endif   
     
 }
 
@@ -66,6 +69,7 @@ int lfsSync(const struct lfs_config *c)
 
     iotexpert_nor_t *nor;
     nor = (iotexpert_nor_t *)c->context;
+    (void)nor;
 
     return LFS_ERR_OK;
 
@@ -78,6 +82,7 @@ int lfsInitConfig(struct lfs_config *cfg)
 
     iotexpert_nor_t *nor;
     nor = (iotexpert_nor_t *)cfg->context;
+    (void)nor;
 
     // block device operations
     cfg->read  = lfsRead;
@@ -86,11 +91,12 @@ int lfsInitConfig(struct lfs_config *cfg)
     cfg->sync  = lfsSync;
 
     // block device configuration
-    cfg->read_size       = 16;
-    cfg->prog_size       = 16;
-    cfg->block_size      = 256*1024;            // 256 kbytes per sector
+    cfg->read_size       = 16;                  // Tuning parameter
+    cfg->prog_size       = 16;                  // Only program aligned to this and a max of this
 
-    cfg->block_count     = 256;                 // 256 * 256 kb = 64mbytes 
+    cfg->block_size      = 256*1024;            // 256 kbytes per sector
+    cfg->block_count     = 256;                 // 256 * 256 kb = 64mbytes
+    
     cfg->cache_size      = 16;
     cfg->lookahead_size  = 16;
     cfg->block_cycles    = 500;
